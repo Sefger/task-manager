@@ -1,3 +1,4 @@
+use std::fs;
 use axum::{extract::{Path, State, Form}, Json};
 use sqlx::PgPool;
 use serde_json::{json, Value};
@@ -7,7 +8,7 @@ use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
-
+use include_dir::{include_dir, Dir};
 #[derive(Debug, Deserialize)]
 pub struct TaskForm {
     pub title: String,
@@ -110,4 +111,32 @@ pub async fn create_task_page() -> Html<&'static str> {
         </html>
         "#
     )
+}
+// pub async fn root_handler() ->Box<dyn IntoResponse> {
+//     match fs::read_to_string("templates/index.html") {
+//         Ok(html) => Box::new(Html(html)),
+//         Err(e) => {
+//             eprintln!("Failed to read template: {}", e);
+//             Box::new((
+//                 StatusCode::INTERNAL_SERVER_ERROR,
+//                 "Internal Server Error - Template not found"
+//             ).into_response())
+//         }
+//     }
+// }
+
+pub async fn root_handler() -> impl IntoResponse {
+    match fs::read_to_string("templates/index.html") {
+        Ok(html) => Html(html),
+        Err(e) => {
+            eprintln!("Failed to read template: {}", e);
+            Html(format!(
+                r#"<html><body style="color: red">
+                <h1>Internal Server Error</h1>
+                <p>Template not found: {}</p>
+                </body></html>"#,
+                e
+            ))
+        }
+    }
 }
