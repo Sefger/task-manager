@@ -5,7 +5,7 @@ mod models;
 use axum::{Router, routing::{get,post}, extract::State, response::IntoResponse};
 use std::net::SocketAddr;
 use std::sync::Arc;
-
+use tower_http::services::ServeDir;
 #[tokio::main]
 async fn main() {
     // Подключение к SQLite
@@ -16,7 +16,8 @@ async fn main() {
 
     // Роутинг
     let app = Router::new()
-        .route("/", get(|| async { "Hello, Task Manager!" }))
+        .route("/", get(handler::root_handler))
+        .nest_service("/static", ServeDir::new("static"))
         .route("/create-task", get(handler::create_task_page))
         .route("/tasks",
                get({
