@@ -2,14 +2,14 @@ mod db;
 mod handler;
 mod models;
 
-use axum::{Router, routing::get, extract::State};
+use axum::{Router, routing::{get,post}, extract::State, response::IntoResponse};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
     // Подключение к SQLite
-    let pool = db::init_db().await;
+    let pool = db::init_db().await.expect("Don`t init db");
 
     // Оборачиваем pool в Arc для реализации Clone
     let shared_pool = Arc::new(pool);
@@ -17,6 +17,7 @@ async fn main() {
     // Роутинг
     let app = Router::new()
         .route("/", get(|| async { "Hello, Task Manager!" }))
+        .route("/create-task", get(handler::create_task_page))
         .route("/tasks",
                get({
                    let pool = Arc::clone(&shared_pool);
@@ -24,7 +25,7 @@ async fn main() {
                })
                    .post({
                        let pool = Arc::clone(&shared_pool);
-                       move |json| handler::create_task(State(pool), json)
+                       move |form| handler::create_task(State(pool), form)
                    }))
         .route("/tasks/{id}",
                get({
