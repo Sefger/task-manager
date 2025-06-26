@@ -1,3 +1,50 @@
-fn main(){
-    println!("hello")
+mod db;
+mod handler;
+mod models;
+
+use axum::{Router, routing::get, extract::State};
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() {
+    // Подключение к SQLite
+    let pool = db::init_db().await;
+
+    // Оборачиваем pool в Arc для реализации Clone
+    let shared_pool = Arc::new(pool);
+
+    // Роутинг
+    let app = Router::new()
+        .route("/", get(|| async { "Hello, Task Manager!" }))
+        .route("/tasks",
+               get({
+                   let pool = Arc::clone(&shared_pool);
+                   move || handler::get_tasks(State(pool))
+               })
+                   .post({
+                       let pool = Arc::clone(&shared_pool);
+                       move |json| handler::create_task(State(pool), json)
+                   }))
+        .route("/tasks/{id}",
+               get({
+                   let pool = Arc::clone(&shared_pool);
+                   move |path| handler::get_task(path, State(pool))
+               })
+                   .put({
+                       let pool = Arc::clone(&shared_pool);
+                       move |path, json| handler::update_task(path,State(pool), json)
+                   })
+                   .delete({
+                       let pool = Arc::clone(&shared_pool);
+                       move |path| handler::delete_task(path, State(pool))
+                   }));
+
+    // Запуск сервера
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    println!("Server running on http://{}", addr);
+
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.unwrap(), app
+    ).await.unwrap()
 }

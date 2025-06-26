@@ -1,12 +1,13 @@
 use axum::{extract::{Path, State}, Json};
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use serde_json::{json, Value};
 use crate::models::Task;
+use std::sync::Arc;
 
 //get all task
-pub async fn get_tasks(State(pool):State<SqlitePool>)->Json<Vec<Task>>{
+pub async fn get_tasks(State(pool):State<Arc<PgPool>>)->Json<Vec<Task>>{
     let tasks = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks")
-        .fetch_all(&pool)
+        .fetch_all(&*pool)
         .await
         .unwrap();
 
@@ -14,12 +15,12 @@ pub async fn get_tasks(State(pool):State<SqlitePool>)->Json<Vec<Task>>{
 }
 
 //create task
-pub async fn create_task(State(pool):State<SqlitePool>, Json(task): Json<Task>)->Json<Task>{
-    let _ = sqlx::query!(
-        "INSERT INTO tasks (title, completed) VALUES (?, ?)",
-        task.title, task.compited
+pub async fn create_task(State(pool):State<Arc<PgPool>>, Json(task): Json<Task>)->Json<Task>{
+     sqlx::query(
+        "INSERT INTO tasks (title, completed) VALUES ({task.title}, {task.completed})",
+
     )
-        .excute(&pool)
+        .execute(&*pool)
         .await
         .unwrap();
     Json(task)
@@ -27,27 +28,28 @@ pub async fn create_task(State(pool):State<SqlitePool>, Json(task): Json<Task>)-
 
 //get task
 
-pub async fn get_task(Path(id): Path<i64>, State(pool): State<SqlitePool>)-> Json<Task>{
-    let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = ?").bind(id)
-        .fetch_one(&pool)
+pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>)-> Json<Task>{
+    let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = {}").bind(id)
+        .fetch_one(&*pool)
         .await
         .unwrap();
     Json(task)
 }
 
 //update task
-pub async fn update_task(Path(id): Path<i64>,State(pool):State<SqlitePool>, Json(task):Json<Task>)->Json<Task>{
-    let _ = sqlx::query!("UPDATE tasks SET title = ?, completed = ?, WHERE id = ?", task.title, task.completed, id)
-        .execute(&pool)
+pub async fn update_task(Path(id): Path<i64>,State(pool):State<Arc<PgPool>>, Json(task):Json<Task>)->Json<Task>{
+    let _id = id;
+    sqlx::query("UPDATE tasks SET title = {task.title}, completed = {task.completed} WHERE id = {_id}" )
+        .execute(&*pool)
         .await
         .unwrap();
     Json(task)
 }
 
 //delete task
-pub async fn delete_task(Path(id): Path<i64>, State(pool): State<SqlitePool>)->Json<Value>{
-    let _ = sqlx::query!("Delete FROM tasks WHERE id = ?", id)
-        .execute(&pool)
+pub async fn delete_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>)->Json<Value>{
+    sqlx::query("DELETE FROM tasks WHERE id = {id}")
+        .execute(&*pool)
         .await
         .unwrap();
     Json(json!({"message": format!("Task {} deleted", id)}))
