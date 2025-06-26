@@ -1,11 +1,21 @@
-use axum::{extract::{Path, State}, Json};
+use axum::{extract::{Path, State, Form}, Json};
 use sqlx::PgPool;
 use serde_json::{json, Value};
 use crate::models::Task;
 use std::sync::Arc;
+use axum::extract::Request;
+use axum::http::StatusCode;
+use axum::response::{Html, IntoResponse, Redirect};
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct TaskForm {
+    pub title: String,
+    pub completed: Option<bool>,
+}
 
 //get all task
-pub async fn get_tasks(State(pool):State<Arc<PgPool>>)->Json<Vec<Task>>{
+pub async fn get_tasks(State(pool): State<Arc<PgPool>>) -> Json<Vec<Task>> {
     let tasks = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks")
         .fetch_all(&*pool)
         .await
@@ -15,21 +25,29 @@ pub async fn get_tasks(State(pool):State<Arc<PgPool>>)->Json<Vec<Task>>{
 }
 
 //create task
-pub async fn create_task(State(pool):State<Arc<PgPool>>, Json(task): Json<Task>)->Json<Task>{
-     sqlx::query(
-        "INSERT INTO tasks (title, completed) VALUES ({task.title}, {task.completed})",
-
-    )
-        .execute(&*pool)
+pub async fn create_task(State(pool): State<Arc<PgPool>>, Form(form): Form<TaskForm>) -> Result<Redirect, (StatusCode, String)> {
+    if form.title.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Title cannot be empty".into()));
+    }
+    let completed = form.completed.unwrap_or(false);
+    match sqlx::query_as::<_, Task>(
+        "INSERT INTO tasks (title,completed) VALUES ($1, $2) RETURNING id, title, completed")
+        .bind(&form.title)
+        .bind(completed)
+        .fetch_one(&*pool)
         .await
-        .unwrap();
-    Json(task)
+    {
+        Ok(task)=> Ok(Redirect::to(&format!("/tasks/{}", task.id))),
+        Err(e)=>{
+            eprintln!("Failed to create task: {}", e);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create task". into()))
+        }
+    }
 }
-
 //get task
 
-pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>)-> Json<Task>{
-    let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = {}").bind(id)
+pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -> Json<Task> {
+    let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = $1").bind(id)
         .fetch_one(&*pool)
         .await
         .unwrap();
@@ -37,9 +55,9 @@ pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>)-> Js
 }
 
 //update task
-pub async fn update_task(Path(id): Path<i64>,State(pool):State<Arc<PgPool>>, Json(task):Json<Task>)->Json<Task>{
+pub async fn update_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>, Json(task): Json<Task>) -> Json<Task> {
     let _id = id;
-    sqlx::query("UPDATE tasks SET title = {task.title}, completed = {task.completed} WHERE id = {_id}" )
+    sqlx::query("UPDATE tasks SET title = {task.title}, completed = {task.completed} WHERE id = {_id}")
         .execute(&*pool)
         .await
         .unwrap();
@@ -47,10 +65,49 @@ pub async fn update_task(Path(id): Path<i64>,State(pool):State<Arc<PgPool>>, Jso
 }
 
 //delete task
-pub async fn delete_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>)->Json<Value>{
+pub async fn delete_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -> Json<Value> {
     sqlx::query("DELETE FROM tasks WHERE id = {id}")
         .execute(&*pool)
         .await
         .unwrap();
     Json(json!({"message": format!("Task {} deleted", id)}))
+}
+
+pub async fn create_task_page() -> Html<&'static str> {
+    Html(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Create New Task</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                form { max-width: 500px; }
+                .form-group { margin-bottom: 15px; }
+                label { display: block; margin-bottom: 5px; }
+                input[type="text"] { width: 100%; padding: 8px; }
+                button { padding: 8px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+                .error { color: red; }
+            </style>
+        </head>
+        <body>
+            <h1>Create New Task</h1>
+            <form action="/tasks" method="post">
+                <div class="form-group">
+                    <label for="title">Title:</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="completed" name="completed">
+                        Completed
+                    </label>
+                </div>
+                <button type="submit">Create Task</button>
+            </form>
+            <p><a href="/tasks">View all tasks</a></p>
+        </body>
+        </html>
+        "#
+    )
 }
