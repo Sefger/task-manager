@@ -1,0 +1,1 @@
+A small site with a task manager to use it you need to create .env. Written in axum, as a way to study the framework
