@@ -117,3 +117,34 @@ pub async fn root_handler() -> impl IntoResponse {
         }
     }
 }
+pub async fn task_detail_page(Path(id): Path<i32>, State(pool):State<Arc<PgPool>>)->impl IntoResponse{
+    //получаем задачу
+    let task_result = sqlx::query_as::<_, Task>(
+        "SELECT id, title, completed FROM tasks WHERE id = $1"
+    )
+        .bind(id)
+        .fetch_one(&*pool)
+        .await;
+    match task_result{
+        Ok(task)=>{
+            let html = fs::read_to_string("templates/task.html")
+                .unwrap()
+                .replace("{id}", &task.id.to_string())
+                .replace("{title}", &task.title)
+                .replace("{completed_class}", if task.completed{"completed"}else{""})
+                .replace("{status_text}", if task.completed{"Done"}else{"Not done"});
+            Html(html)
+        }
+        Err(e) => {
+            eprintln!("Failed to read template: {}", e);
+            Html(format!(
+                r#"<html><body style="color: red">
+                <h1>Internal Server Error</h1>
+                <p>Template not found: {}</p>
+                </body></html>"#,
+                e
+            ))
+        }
+    }
+
+}

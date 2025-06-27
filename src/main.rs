@@ -16,6 +16,7 @@ async fn main() {
 
     // Роутинг
     let app = Router::new()
+
         .route("/", get(handler::root_handler))
         .nest_service("/static", ServeDir::new("static"))
         .route("/create-task", get(handler::create_task_page))
@@ -31,8 +32,11 @@ async fn main() {
         .route("/tasks/{id}",
                get({
                    let pool = Arc::clone(&shared_pool);
-                   move |path| handler::get_task(path, State(pool))
+                   move |path| handler::task_detail_page(path, State(pool))
                })
+                   // .post({let pool = Arc::clone(&shared_pool);
+                   // move|path, form| handler::delete_task(path, State(pool))
+                   // })
                    .put({
                        let pool = Arc::clone(&shared_pool);
                        move |path, json| handler::update_task(path,State(pool), json)
