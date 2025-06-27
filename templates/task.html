@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детали задачи</title>
+    <link rel = "stylesheet" href = "/static/task.css">
+</head>
+<body>
+<div class="container">
+    <h1>Детали задачи</h1>
+
+    <div class="task-details">
+        <div class="task-id">ID задачи: {id}</div>
+        <h2 class="task-title">{title}</h2>
+        <div class="task-status {completed_class}">
+            {status_text}
+        </div>
+    </div>
+
+    <div class="actions">
+        <form action="/tasks/{id}" method="POST">
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="btn btn-danger">Удалить</button>
+        </form>
+        <a href="/tasks/{id}/edit" class="btn btn-primary">Редактировать</a>
+    </div>
+
+    <a href="/" class="back-link">← Вернуться к списку задач</a>
+</div>
+
+</body>
+</html>
