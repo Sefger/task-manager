@@ -74,43 +74,20 @@ pub async fn delete_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -
     Json(json!({"message": format!("Task {} deleted", id)}))
 }
 
-pub async fn create_task_page() -> Html<&'static str> {
-    Html(
-        r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Create New Task</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                form { max-width: 500px; }
-                .form-group { margin-bottom: 15px; }
-                label { display: block; margin-bottom: 5px; }
-                input[type="text"] { width: 100%; padding: 8px; }
-                button { padding: 8px 15px; background: #4CAF50; color: white; border: none; cursor: pointer; }
-                .error { color: red; }
-            </style>
-        </head>
-        <body>
-            <h1>Create New Task</h1>
-            <form action="/tasks" method="post">
-                <div class="form-group">
-                    <label for="title">Title:</label>
-                    <input type="text" id="title" name="title" required>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="completed" name="completed">
-                        Completed
-                    </label>
-                </div>
-                <button type="submit">Create Task</button>
-            </form>
-            <p><a href="/tasks">View all tasks</a></p>
-        </body>
-        </html>
-        "#
-    )
+pub async fn create_task_page() -> impl IntoResponse {
+    match fs::read_to_string("templates/create-task.html"){
+        Ok(html)=>Html(html),
+        Err(e)=> {
+            eprintln!("Failed to read template: {}", e);
+            Html(format!(
+                r#"<html><body style="color: red">
+                <h1>Internal Server Error</h1>
+                <p>Template not found: {}</p>
+                </body></html>"#,
+                e
+            ))
+        }
+    }
 }
 // pub async fn root_handler() ->Box<dyn IntoResponse> {
 //     match fs::read_to_string("templates/index.html") {
