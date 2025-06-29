@@ -1,5 +1,5 @@
 use sqlx::postgres::{PgPool, PgPoolOptions, PgConnectOptions};
-use sqlx::ConnectOptions;
+
 use dotenv::dotenv;
 use std::env;
 use std::str::FromStr;

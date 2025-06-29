@@ -2,7 +2,7 @@ mod db;
 mod handler;
 mod models;
 
-use axum::{Router, routing::{get,post}, extract::State, response::IntoResponse};
+use axum::{Router, routing::{get}, extract::State};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::ServeDir;

@@ -4,11 +4,11 @@ use sqlx::PgPool;
 use serde_json::{json, Value};
 use crate::models::Task;
 use std::sync::Arc;
-use axum::extract::Request;
+// use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
-use include_dir::{include_dir, Dir};
+// use include_dir::{include_dir};
 #[derive(Debug, Deserialize)]
 pub struct TaskForm {
     pub title: String,
@@ -47,13 +47,13 @@ pub async fn create_task(State(pool): State<Arc<PgPool>>, Form(form): Form<TaskF
 }
 //get task
 
-pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -> Json<Task> {
-    let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = $1").bind(id)
-        .fetch_one(&*pool)
-        .await
-        .unwrap();
-    Json(task)
-}
+// pub async fn get_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -> Json<Task> {
+//     let task = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks WHERE id = $1").bind(id)
+//         .fetch_one(&*pool)
+//         .await
+//         .unwrap();
+//     Json(task)
+// }
 
 //update task
 pub async fn update_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>, Json(task): Json<Task>) -> Json<Task> {
