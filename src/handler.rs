@@ -8,6 +8,7 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
+
 // use include_dir::{include_dir};
 #[derive(Debug, Deserialize)]
 pub struct TaskForm {
@@ -16,13 +17,25 @@ pub struct TaskForm {
 }
 
 //get all task
-pub async fn get_tasks(State(pool): State<Arc<PgPool>>) -> Json<Vec<Task>> {
+pub async fn get_tasks(State(pool): State<Arc<PgPool>>) -> Html<String> {
     let tasks = sqlx::query_as::<_, Task>("SELECT id, title, completed FROM tasks")
         .fetch_all(&*pool)
         .await
         .unwrap();
 
-    Json(tasks)
+    let tasks_html = tasks.iter().map(|task| {
+        let completed_class = if task.completed { "completed" } else { "" };
+        let status = if task.completed { "✓" } else { "✗" };
+        format!(r#"<div class="task"><span class="task-status">{}</span><span class="task-title {}">{}</span></div>"#, status,completed_class, task.title)
+    }).collect::<Vec<_>>().join("");
+
+    match fs::read_to_string("templates/tasks.html") {
+        Ok(template) => Html(template.replace("{tasks}", &tasks_html)),
+        Err(e) => {
+            eprintln!("Template error: {}", e);
+            Html("<h1> Template Error, Sorry</h1>".to_string())
+        }
+    }
 }
 
 //create task
@@ -38,10 +51,10 @@ pub async fn create_task(State(pool): State<Arc<PgPool>>, Form(form): Form<TaskF
         .fetch_one(&*pool)
         .await
     {
-        Ok(task)=> Ok(Redirect::to(&format!("/tasks/{}", task.id))),
-        Err(e)=>{
+        Ok(task) => Ok(Redirect::to(&format!("/tasks/{}", task.id))),
+        Err(e) => {
             eprintln!("Failed to create task: {}", e);
-            Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create task". into()))
+            Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create task".into()))
         }
     }
 }
@@ -75,9 +88,9 @@ pub async fn delete_task(Path(id): Path<i64>, State(pool): State<Arc<PgPool>>) -
 }
 
 pub async fn create_task_page() -> impl IntoResponse {
-    match fs::read_to_string("templates/create-task.html"){
-        Ok(html)=>Html(html),
-        Err(e)=> {
+    match fs::read_to_string("templates/create-task.html") {
+        Ok(html) => Html(html),
+        Err(e) => {
             eprintln!("Failed to read template: {}", e);
             Html(format!(
                 r#"<html><body style="color: red">
@@ -117,7 +130,8 @@ pub async fn root_handler() -> impl IntoResponse {
         }
     }
 }
-pub async fn task_detail_page(Path(id): Path<i32>, State(pool):State<Arc<PgPool>>)->impl IntoResponse{
+
+pub async fn task_detail_page(Path(id): Path<i32>, State(pool): State<Arc<PgPool>>) -> impl IntoResponse {
     //получаем задачу
     let task_result = sqlx::query_as::<_, Task>(
         "SELECT id, title, completed FROM tasks WHERE id = $1"
@@ -125,14 +139,14 @@ pub async fn task_detail_page(Path(id): Path<i32>, State(pool):State<Arc<PgPool>
         .bind(id)
         .fetch_one(&*pool)
         .await;
-    match task_result{
-        Ok(task)=>{
+    match task_result {
+        Ok(task) => {
             let html = fs::read_to_string("templates/task.html")
                 .unwrap()
                 .replace("{id}", &task.id.to_string())
                 .replace("{title}", &task.title)
-                .replace("{completed_class}", if task.completed{"completed"}else{""})
-                .replace("{status_text}", if task.completed{"Done"}else{"Not done"});
+                .replace("{completed_class}", if task.completed { "completed" } else { "" })
+                .replace("{status_text}", if task.completed { "Done" } else { "Not done" });
             Html(html)
         }
         Err(e) => {
@@ -146,5 +160,4 @@ pub async fn task_detail_page(Path(id): Path<i32>, State(pool):State<Arc<PgPool>
             ))
         }
     }
-
 }
